@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+
+*.pyc
+
+# Virtual environments
+venv/
+.env/
+
+# macOS
+.DS_Store
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Large raw data
+data/raw/
+
+# VS Code settings
+.vscode/
+
+# Environment variables
+.env
