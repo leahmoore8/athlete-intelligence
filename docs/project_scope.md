@@ -1,0 +1,2 @@
+- build end to end athlete intelligence ml pipeline
+- ingests raw Garmin data and produces
