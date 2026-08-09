@@ -40,53 +40,110 @@ def require_columns(runs: pd.DataFrame, columns: list[str]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def add_recovery_spacing_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add the number of days since the athlete's previous run.
+def add_recovery_spacing_features(
+    runs: pd.DataFrame,
+) -> pd.DataFrame:
+    require_columns(
+        runs,
+        ["Date"],
+    )
 
-    Planned column:
-    - ``days_since_previous_run``
+    runs_with_features = (
+        runs.copy()
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
 
-    Required input: ``Date``.
+    activity_date = (
+        runs_with_features["Date"].dt.normalize()
+    )
 
-    TODO: Copy the data, sort chronologically, calculate the difference between
-    consecutive run datetimes, and decide whether the final value should use
-    fractional days or calendar-day boundaries.
-    """
+    runs_with_features["days_since_previous_run"] = (
+        activity_date
+        .diff()
+        .dt.days
+        .astype("Int64")
+    )
 
-    raise NotImplementedError
+    return runs_with_features
 
 
 def add_rolling_distance_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add recent distance totals using calendar-based rolling windows.
+    require_columns(runs, ["Date", "Distance"])
 
-    Planned columns:
-    - ``rolling_7_day_distance_km``
-    - ``rolling_28_day_distance_km``
+    runs_with_features = (
+        runs.copy()
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
 
-    Required inputs: ``Date`` and ``Distance``.
+    runs_with_features["rolling_7_day_distance_km"] = (
+        runs_with_features
+        .rolling(
+            window="7D",
+            on="Date",
+            min_periods=1,
+        )["Distance"]
+        .sum()
+    )
 
-    TODO: Sort by date and use time-based windows. Document whether each window
-    includes the current run; the recommended definition includes it.
-    """
+    runs_with_features["rolling_28_day_distance_km"] = (
+        runs_with_features
+        .rolling(
+            window="28D",
+            on="Date",
+            min_periods=1,
+        )["Distance"]
+        .sum()
+    )
 
-    raise NotImplementedError
+    return runs_with_features
 
 
 def summarize_weekly_training(runs: pd.DataFrame) -> pd.DataFrame:
-    """Return one row per calendar week containing volume aggregates.
+    require_columns(
+        runs,
+        [
+            "Date",
+            "Distance",
+            "Moving Time",
+            "Activity Type",
+        ],
+    )
 
-    Planned columns:
-    - ``weekly_distance_km``
-    - ``weekly_running_minutes``
-    - ``weekly_run_count``
+    runs_with_week = runs.copy()
 
-    Required inputs: ``Date``, ``Distance``, and ``Moving Time``.
+    # Define each calendar week as Monday through Sunday
+    runs_with_week["week_start"] = (
+        runs_with_week["Date"]
+        .dt.to_period("W-SUN")
+        .dt.start_time
+    )
 
-    Weekly TSS is excluded because the current export contains only zero TSS
-    values and the cleaning pipeline removes that column.
-    """
+    weekly_training = (
+        runs_with_week
+        .groupby("week_start", as_index=False)
+        .agg(
+            weekly_distance_km=(
+                "Distance",
+                "sum",
+            ),
+            weekly_running_minutes=(
+                "Moving Time",
+                lambda durations: (
+                    durations.dt.total_seconds().sum() / 60
+                ),
+            ),
+            weekly_run_count=(
+                "Activity Type",
+                "count",
+            ),
+        )
+        .sort_values("week_start")
+        .reset_index(drop=True)
+    )
 
-    raise NotImplementedError
+    return weekly_training
 
 
 # ---------------------------------------------------------------------------
@@ -134,20 +191,127 @@ def add_speed_features(runs: pd.DataFrame) -> pd.DataFrame:
 
     return runs_with_features
 
+def add_speed_quality_features(
+    runs: pd.DataFrame,
+    max_difference_pct: float = 10.0,
+) -> pd.DataFrame:
+    require_columns(
+        runs,
+        [
+            "Avg Pace",
+            "average_speed_kmh",
+        ],
+    )
 
-def add_optional_intensity_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add intensity features currently marked Later in the plan.
+    if max_difference_pct < 0:
+        raise ValueError(
+            "max_difference_pct cannot be negative"
+        )
 
-    Potential columns:
-    - ``relative_hr_intensity``
-    - ``aerobic_effect_per_minute``
+    runs_with_features = runs.copy()
 
-    Relative HR intensity also requires an explicitly documented athlete
-    maximum heart rate. TSS per minute is excluded for the current export.
-    """
+    valid_pace = runs_with_features["Avg Pace"].where(
+        runs_with_features["Avg Pace"] > 0
+    )
 
-    raise NotImplementedError
+    runs_with_features["speed_from_pace_kmh"] = (
+        60 / valid_pace
+    )
 
+    runs_with_features["speed_difference_pct"] = (
+        (
+            runs_with_features["average_speed_kmh"]
+            - runs_with_features["speed_from_pace_kmh"]
+        ).abs()
+        / runs_with_features["speed_from_pace_kmh"]
+        * 100
+    )
+
+    speed_quality_flag = (
+        runs_with_features["speed_difference_pct"]
+        > max_difference_pct
+    ).astype("boolean")
+
+    runs_with_features["speed_quality_flag"] = (
+        speed_quality_flag.mask(
+            runs_with_features["speed_difference_pct"].isna(),
+            pd.NA,
+        )
+    )
+
+    return runs_with_features
+
+
+def add_intensity_features(
+    runs: pd.DataFrame,
+    athlete_max_hr: float,
+) -> pd.DataFrame:
+    require_columns(
+        runs,
+        [
+            "Avg HR",
+            "Aerobic TE",
+            "moving_minutes",
+        ],
+    )
+
+    if athlete_max_hr <= 0:
+        raise ValueError(
+            "athlete_max_hr must be greater than zero"
+        )
+
+    runs_with_features = runs.copy()
+
+    valid_hr = (
+        runs_with_features["Avg HR"].notna()
+        & (runs_with_features["Avg HR"] > 0)
+    )
+
+    runs_with_features["relative_hr_intensity"] = pd.NA
+
+    runs_with_features.loc[
+        valid_hr,
+        "relative_hr_intensity",
+    ] = (
+        runs_with_features.loc[valid_hr, "Avg HR"]
+        / athlete_max_hr
+    )
+
+    valid_aerobic_effect = (
+        runs_with_features["Aerobic TE"].notna()
+        & runs_with_features["moving_minutes"].notna()
+        & (runs_with_features["moving_minutes"] > 0)
+    )
+
+    runs_with_features["aerobic_effect_per_minute"] = pd.NA
+
+    runs_with_features.loc[
+        valid_aerobic_effect,
+        "aerobic_effect_per_minute",
+    ] = (
+        runs_with_features.loc[
+            valid_aerobic_effect,
+            "Aerobic TE",
+        ]
+        / runs_with_features.loc[
+            valid_aerobic_effect,
+            "moving_minutes",
+        ]
+    )
+
+    runs_with_features["relative_hr_intensity"] = (
+        pd.to_numeric(
+            runs_with_features["relative_hr_intensity"]
+        )
+    )
+
+    runs_with_features["aerobic_effect_per_minute"] = (
+        pd.to_numeric(
+            runs_with_features["aerobic_effect_per_minute"]
+        )
+    )
+
+    return runs_with_features
 
 # ---------------------------------------------------------------------------
 # Aerobic-efficiency features
@@ -155,22 +319,43 @@ def add_optional_intensity_features(runs: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_aerobic_efficiency_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add transparent cardiovascular-efficiency proxy features.
+    require_columns(
+        runs,
+        [
+            "average_speed_kmh",
+            "Avg HR",
+            "Avg Power",
+        ],
+    )
 
-    Planned MVP columns:
-    - ``heart_rate_efficiency_proxy`` = average speed / average HR
-    - ``power_to_hr_ratio`` = average power / average HR
-    - ``speed_to_power_ratio`` = average speed / average power
+    runs_with_features = runs.copy()
 
-    Possible Later column:
-    - ``pace_per_watt`` = average pace / average power
+    valid_hr = runs_with_features["Avg HR"].where(
+        runs_with_features["Avg HR"] > 0
+    )
 
-    Required inputs depend on the feature. Preserve missing values whenever HR,
-    power, speed, or pace is missing or zero. These are project-defined proxies,
-    not clinical measurements of running economy.
-    """
+    valid_power = runs_with_features["Avg Power"].where(
+        runs_with_features["Avg Power"] > 0
+    )
 
-    raise NotImplementedError
+    speed_metres_per_minute = (
+        runs_with_features["average_speed_kmh"] * 1000
+        / 60
+    )
+
+    runs_with_features["metres_per_heartbeat"] = (
+        speed_metres_per_minute / valid_hr
+    )
+
+    runs_with_features["power_to_hr_ratio"] = (
+        valid_power / valid_hr
+    )
+
+    runs_with_features["speed_to_power_ratio"] = (
+        runs_with_features["average_speed_kmh"] / valid_power
+    )
+
+    return runs_with_features
 
 
 # ---------------------------------------------------------------------------
@@ -178,21 +363,41 @@ def add_aerobic_efficiency_features(runs: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def add_terrain_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add features describing climbing and stopped time.
+def add_terrain_features(
+    runs: pd.DataFrame,
+) -> pd.DataFrame:
+    require_columns(
+        runs,
+        [
+            "Distance",
+            "Total Ascent",
+            "moving_minutes",
+            "elapsed_minutes",
+        ],
+    )
 
-    Planned MVP columns:
-    - ``climbing_density_m_per_km`` = total ascent / distance
-    - ``pause_ratio`` = (elapsed time - moving time) / elapsed time
+    runs_with_features = runs.copy()
 
-    Possible Later column:
-    - ``ascent_per_hour`` = total ascent / moving time in hours
+    valid_distance = runs_with_features["Distance"].where(
+        runs_with_features["Distance"] > 0
+    )
 
-    Missing treadmill elevation must remain missing rather than becoming zero.
-    Rate features must remain missing when their denominator is zero.
-    """
+    valid_elapsed_time = runs_with_features[
+        "elapsed_minutes"
+    ].where(
+        runs_with_features["elapsed_minutes"] > 0
+    )
 
-    raise NotImplementedError
+    runs_with_features["climbing_density_m_per_km"] = (
+        runs_with_features["Total Ascent"] / valid_distance
+    )
+
+    runs_with_features["pause_ratio"] = (
+        (runs_with_features["elapsed_minutes"] - runs_with_features["moving_minutes"])
+        / valid_elapsed_time
+    )
+
+    return runs_with_features
 
 
 # ---------------------------------------------------------------------------
@@ -235,17 +440,6 @@ def add_calendar_features(runs: pd.DataFrame) -> pd.DataFrame:
     raise NotImplementedError
 
 
-def add_activity_title_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Create initial workout labels from activity-title keywords.
-
-    Candidate keywords from the plan include easy, tempo, interval, race, and
-    long. Inspect real titles and document precedence rules before implementing
-    the labels; do not silently treat unmatched titles as a known workout type.
-    """
-
-    raise NotImplementedError
-
-
 def add_distance_category(runs: pd.DataFrame) -> pd.DataFrame:
     """Assign the Later-stage short, medium, and long distance categories.
 
@@ -271,8 +465,7 @@ def add_mvp_run_features(runs: pd.DataFrame) -> pd.DataFrame:
     4. calendar;
     5. recovery spacing;
     6. rolling distance;
-    7. aerobic efficiency; and
-    8. activity-title features.
+    7. aerobic efficiency.
 
     Weekly summaries are intentionally separate because they return one row per
     week rather than one row per activity.

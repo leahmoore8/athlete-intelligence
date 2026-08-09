@@ -84,7 +84,6 @@ A combined mechanics score should not be created until the relationships between
 | Month | Extract month from activity date | Date | Supports monthly comparisons and seasonal trend analysis | MVP |
 | Week | Extract calendar week from activity date | Date | Supports weekly aggregation | MVP |
 | Day of Week | Extract weekday from activity date | Date | Explores training patterns across the week | Later |
-| Activity Title Keywords | Identify terms such as `easy`, `tempo`, `interval`, `race`, or `long` within the activity title | Title | Helps create initial workout-type labels | MVP |
 | Distance Category | Assign runs to short, medium, and long-distance ranges | Distance | Supports comparisons between broadly similar runs | Later |
 
 ---
