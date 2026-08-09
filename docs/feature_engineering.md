@@ -20,7 +20,6 @@ The initial version uses activity-level running data. Features requiring second-
 |---|---|---|---|---|
 | Weekly Distance | Sum of `Distance` for each calendar week | Date, Distance | Measures changes in weekly running volume | MVP |
 | Weekly Running Time | Sum of `Moving Time` for each calendar week | Date, Moving Time | Measures total weekly time spent running | MVP |
-| Weekly Training Stress | Sum of `Training Stress Score` for each calendar week | Date, Training Stress Score | Estimates accumulated weekly training load | MVP |
 | Weekly Run Count | Count of running activities per week | Date, Activity Type | Measures training frequency | MVP |
 | Rolling 7-Day Distance | Sum of distance completed during the previous 7 days | Date, Distance | Measures recent running volume independent of calendar weeks | MVP |
 | Rolling 28-Day Distance | Sum of distance completed during the previous 28 days | Date, Distance | Represents longer-term training volume | MVP |
@@ -34,7 +33,6 @@ The initial version uses activity-level running data. Features requiring second-
 |---|---|---|---|---|
 | Average Speed | `Distance / Moving Time` | Distance, Moving Time | Converts pace into a numerical value that is easier to use in calculations and models | MVP |
 | Relative Heart-Rate Intensity | `Avg HR / estimated maximum HR` | Avg HR, athlete maximum HR | Normalizes cardiovascular intensity across activities | Later |
-| Training Stress per Minute | `Training Stress Score / Moving Time` | Training Stress Score, Moving Time | Distinguishes concentrated high-intensity sessions from longer low-intensity runs | MVP |
 | Aerobic Effect per Minute | `Aerobic TE / Moving Time` | Aerobic TE, Moving Time | Describes aerobic stimulus relative to workout duration | Later |
 
 ---
