@@ -122,8 +122,8 @@ Raw Garmin data is excluded from the public repository to avoid publishing priva
 - [x] Explore raw Garmin activity data
 - [x] Build reusable cleaning pipeline
 - [x] Add automated cleaning tests
-- [ ] Build feature-engineering pipeline
-- [ ] Add training and performance visualizations
+- [x] Build feature-engineering pipeline
+- [x] Add training and performance visualizations
 - [ ] Implement comparable-run analysis
 - [ ] Develop an initial interactive dashboard
 - [ ] Evaluate interpretable machine-learning approaches
