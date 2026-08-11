@@ -426,18 +426,35 @@ def add_running_mechanics_features(runs: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_calendar_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Add calendar fields derived from the activity date.
+    require_columns(
+        runs,
+        ["Date"],
+    )
 
-    Planned MVP columns:
-    - ``month``
-    - ``calendar_week``
-    - ``calendar_year`` (needed so week numbers remain unambiguous)
+    runs_with_features = runs.copy()
 
-    Possible Later column:
-    - ``day_of_week``
-    """
+    iso_calendar = (
+        runs_with_features["Date"]
+        .dt.isocalendar()
+    )
 
-    raise NotImplementedError
+    runs_with_features["calendar_year"] = (
+        iso_calendar["year"]
+    )
+
+    runs_with_features["calendar_week"] = (
+        iso_calendar["week"]
+    )
+
+    runs_with_features["month"] = (
+        runs_with_features["Date"].dt.month
+    )
+
+    runs_with_features["day_of_week"] = (
+        runs_with_features["Date"].dt.day_name()
+    )
+
+    return runs_with_features
 
 
 def add_distance_category(runs: pd.DataFrame) -> pd.DataFrame:
@@ -455,23 +472,40 @@ def add_distance_category(runs: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def add_mvp_run_features(runs: pd.DataFrame) -> pd.DataFrame:
-    """Apply implemented MVP per-run feature functions in dependency order.
+def add_mvp_run_features(
+    runs: pd.DataFrame,
+    *,
+    speed_difference_threshold_pct: float = 10.0,
+) -> pd.DataFrame:
+    runs_with_features = add_duration_features(runs)
+    runs_with_features = add_speed_features(runs_with_features)
 
-    Intended order:
-    1. duration;
-    2. speed;
-    3. terrain;
-    4. calendar;
-    5. recovery spacing;
-    6. rolling distance;
-    7. aerobic efficiency.
+    runs_with_features = add_speed_quality_features(
+        runs_with_features,
+        max_difference_pct=speed_difference_threshold_pct,
+    )
 
-    Weekly summaries are intentionally separate because they return one row per
-    week rather than one row per activity.
-    """
+    runs_with_features = add_terrain_features(
+        runs_with_features
+    )
 
-    raise NotImplementedError
+    runs_with_features = add_calendar_features(
+        runs_with_features
+    )
+
+    runs_with_features = add_recovery_spacing_features(
+        runs_with_features
+    )
+
+    runs_with_features = add_rolling_distance_features(
+        runs_with_features
+    )
+
+    runs_with_features = add_aerobic_efficiency_features(
+        runs_with_features
+    )
+
+    return runs_with_features
 
 
 # ---------------------------------------------------------------------------

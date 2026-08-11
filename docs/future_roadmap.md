@@ -3,11 +3,9 @@
 ## MVP Analytics
 
 - Weekly distance and running-time trends
-- Weekly training-stress trend
 - Progress toward weekly distance goal
 - Pace–heart rate trend
 - Aerobic-efficiency trend
-- Distribution of workout types
 - Identification of unusually demanding runs
 
 ## Next Version

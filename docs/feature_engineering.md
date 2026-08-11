@@ -41,8 +41,7 @@ The initial version uses activity-level running data. Features requiring second-
 
 | Feature | Formula / Method | Raw Inputs | Purpose | Status |
 |---|---|---|---|---|
-| Heart-Rate Efficiency Proxy | `Average Speed / Avg HR` | Distance, Moving Time, Avg HR | Estimates the amount of running speed produced per heartbeat | MVP |
-| Power-to-Heart-Rate Ratio | `Avg Power / Avg HR` | Avg Power, Avg HR | Estimates external output relative to cardiovascular demand | MVP |
+| Metres per Heartbeat | `(Average Speed × 1000 / 60) / Avg HR` | Distance, Moving Time, Avg HR | Estimates metres travelled per average heartbeat | MVP || Power-to-Heart-Rate Ratio | `Avg Power / Avg HR` | Avg Power, Avg HR | Estimates external output relative to cardiovascular demand | MVP |
 | Speed-to-Power Ratio | `Average Speed / Avg Power` | Distance, Moving Time, Avg Power | Explores how much speed is produced for a given power output | MVP |
 | Pace per Watt | `Avg Pace / Avg Power` | Avg Pace, Avg Power | Alternative representation of running output relative to power | Later |
 
