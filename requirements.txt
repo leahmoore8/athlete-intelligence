@@ -2,4 +2,4 @@ pandas>=2.0
 pytest>=7.0
 
 matplotlib>=3.7
-seaborn>=0.12
+seaborn>=0.13.2,<0.14
